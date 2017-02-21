@@ -3739,3 +3739,74 @@ class TestTicket24605(TestCase):
             ).order_by('pk'),
             [i1, i2, i3], lambda x: x
         )
+
+
+class TestTicketXXX(TestCase):
+    def test_ticket_XXX(self):
+        # Depending on the PYTHONHASHSEED (python3), the folloging code will print either
+        #
+        #
+        #   queryset = Tag.objects.filter(category_id=2).exclude(name='', note__isnull=True)
+        #   print(queryset.query)
+        #   >>>  SELECT "queries_tag"."id", "queries_tag"."name", "queries_tag"."parent_id", "queries_tag"."category_id"
+        #   >>>  FROM "queries_tag"
+        #   >>>  WHERE (
+        #   >>>      "queries_tag"."category_id" = 2
+        #   >>>      AND NOT (
+        #   >>>          "queries_tag"."id" IN (
+        #   >>>              SELECT U0."id" AS Col1 FROM "queries_tag" U0 LEFT OUTER JOIN "queries_note" U1 ON ( U0."id" = U1."tag_id" ) WHERE U1."id" IS NULL)
+        #   >>>          AND "queries_tag"."name" = )
+        #   >>>  )
+        #   >>>  ORDER BY "queries_tag"."name" ASC
+        #
+        #
+        #   OR
+        #
+        #
+        #   queryset = Tag.objects.filter(category_id=2).exclude(name='', note__isnull=True)
+        #   print(queryset.query)
+        #   >>>  SELECT "queries_tag"."id", "queries_tag"."name", "queries_tag"."parent_id", "queries_tag"."category_id"
+        #   >>>  FROM "queries_tag"
+        #   >>>  WHERE (
+        #   >>>      "queries_tag"."category_id" = 2
+        #   >>>      AND NOT (
+        #   >>>          "queries_tag"."id" IN (
+        #   >>>              SELECT U0."id" AS Col1 FROM "queries_tag" U0 LEFT OUTER JOIN "queries_note" U1 ON ( U0."id" = U1."tag_id" ) WHERE (U1."id" IS NULL AND U0."id" = ("queries_tag"."id")))
+        #   >>>                                                                                                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        #   >>>          AND "queries_tag"."name" = )
+        #   >>>  )
+        #   >>>  ORDER BY "queries_tag"."name" ASC
+        #
+        #
+        #   Please also note that if the name='' condition is removed, the subquery does not contain the extra filter
+        #
+        #   queryset = Tag.objects.filter(category_id=2).exclude(note__isnull=True)
+        #   print(queryset.query)
+        #   >>> SELECT "queries_tag"."id", "queries_tag"."name", "queries_tag"."parent_id", "queries_tag"."category_id"
+        #   >>> FROM "queries_tag"
+        #   >>> WHERE (
+        #   >>>     "queries_tag"."category_id" = 2
+        #   >>>     AND NOT (
+        #   >>>         "queries_tag"."id" IN (
+        #   >>>             SELECT U0."id" AS Col1 FROM "queries_tag" U0 LEFT OUTER JOIN "queries_note" U1 ON ( U0."id" = U1."tag_id" ) WHERE U1."id" IS NULL))
+        #   >>> )
+        #   >>> ORDER BY "queries_tag"."name" ASC
+        #
+        #   In my opinion the expected result of this query would rather be
+        #
+        #   >>> SELECT "queries_tag"."id", "queries_tag"."name", "queries_tag"."parent_id", "queries_tag"."category_id"
+        #   >>> FROM "queries_tag"
+        #   >>> WHERE (
+        #   >>>     "queries_tag"."category_id" = 2
+        #   >>>     AND NOT (
+        #   >>>         "queries_tag"."id" IN (
+        #   >>>             SELECT U0."id" AS Col1 FROM "queries_tag" U0 LEFT OUTER JOIN "queries_note" U1 ON ( U0."id" = U1."tag_id" ) WHERE (U1."id" IS NULL AND U0."id" = ("queries_tag"."id")))
+        #   >>>                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        #   >>> )
+        #   >>> ORDER BY "queries_tag"."name" ASC
+        #
+        #   This would avoid a too costly subquery
+
+
+        queryset = Tag.objects.filter(category_id=2).exclude(name='', note__isnull=True)
+        print(queryset.query)
